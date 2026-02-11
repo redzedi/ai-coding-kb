@@ -4,7 +4,7 @@
 
 This prompt defines the **Architect Agent**. It inherits all rules from the **System Universal Prompt** (system-universal.md) and extends them with role-specific responsibilities, behaviors, and tool usage.
 
-This file MUST always be loaded *after* the System Universal Prompt.
+
 
 ---
 

@@ -58,6 +58,11 @@
 
 ## Git Commit Management
 
+### Common skills
+
+- - **Branching conventions**: Following team conventions (syncing `develop-occ` with `master-dbx` before creating feature branches) prevents merge conflicts and keeps branches aligned.
+
+
 ### Combining Multiple Commits
 
 When you have multiple related commits (e.g., implementation + test additions) that should be combined:
@@ -94,6 +99,7 @@ When creating PRs, include these sections:
 5. **Future Changes**: Section left for reviewer/author to add follow-up items
 
 **Key Insight**: Review commit history to understand full scope of changes, not just the most recent commit.
+
 
 
 
