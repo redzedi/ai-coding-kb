@@ -1,0 +1,27 @@
+---
+description: When updating a dependency in a library module, bump that module's version and propagate through the dependency chain until the top-level application.
+globs: **/pom.xml
+alwaysApply: false
+---
+
+# Maven library dependency version chain
+
+When you change a **dependency version** in a **library** module (e.g. brands-api, brands-commons), you must:
+
+1. **Bump that module's own version** (e.g. brands-api 1.0.1.89.8 → 1.0.1.89.9) so consumers can depend on the new build.
+2. **Update every direct consumer** of that module to reference the new version.
+3. **If the consumer is itself a library**, bump its version and repeat step 2.
+4. Continue until you reach the **top-level application** (e.g. brands-service), which should have its dependency ref(s) and its own version updated.
+
+## This repo's chain (athena_brands-modulus-service)
+
+- **cubesdk** (external) → **brands-api** (depends on cubesdk) → **brands-commons** (depends on brands-api) → **brands-service** (depends on brands-commons).
+
+So when updating cubesdk in brands-api:
+
+1. Update cubesdk version in `brands-api/pom.xml`.
+2. Bump `brands-api` version in `brands-api/pom.xml`.
+3. Update brands-api dependency version in `brands-commons/pom.xml` and bump `brands-commons` version.
+4. Update brands-commons dependency version in `brands-service/pom.xml` and bump `brands-service` version.
+
+Apply the same propagation logic for any other library dependency change in this repo.

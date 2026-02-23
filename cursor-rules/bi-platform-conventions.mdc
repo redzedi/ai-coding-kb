@@ -1,0 +1,24 @@
+---
+description: CIQ BI platform — architecture, common filter, schema management, and performance lessons. Apply when working on brands-service, cubesdk, dashboard-service, or databricks-schema-management.
+alwaysApply: true
+---
+
+# BI Platform Conventions and Lessons
+
+**Data flow:** UI → dashboard-service (V1: /entity/metrics/data, V2: /data) → brands-service (/cube/execute, cubesdk) → Databricks SQL Warehouse.
+
+**Common filter — 1P vs 3P:** 1P uses parameterized UDF `brands_cubes.common_filter_udf(#CLIENT_ID_PARAM)` (cubesdk substitutes client_id; pushdown guaranteed). 3P uses plain view `seller_cubes.common_filter_view`; pushdown depends on optimizer. View selection: `BasicQueryGeneratorImpl.getCommonFilterQuery()`; constants in `Constants.java` (AMAZON_3P_COMMON_FILTER_CUBE_VIEW vs COMMON_FILTER_CUBE_VIEW).
+
+**Multi-tenant views and window functions:** In views used with a tenant filter (e.g. WHERE client_id = ?), any window must include the tenant key in PARTITION BY (e.g. PARTITION BY client_id, campaign_id). Otherwise the optimizer cannot push the filter below the window, causing full-table processing and spill. Omitting tenant key can also cause cross-tenant data leakage if IDs (e.g. campaign_id) are not unique across tenants.
+
+**seller_cubes.common_filter_view:** Four CTEs joined by (asin, client_id): common_filter_fact_table (a), client_internal_catalog (b), brands_common_filter_fact_table (c), campaigns_asin_workbench (d). The campaigns_asin_workbench CTE uses FIRST_VALUE(...) OVER (PARTITION BY ...); that PARTITION BY must include client_id for filter pushdown.
+
+**View resolution:** `client_catalog.seller_cubes.common_filter_view` is the definition; `client_view_catalog.seller_cubes.common_filter_view` is the RLS wrapper. Prefer querying client_catalog when investigating (client_view_catalog may return 0 rows depending on credentials).
+
+**Bundle requests:** In brands-service, bundle key (e.g. ams_campaigns_asin_workbench_v2) is not the cube name. The actual cube name is in the value’s `cubeName` (e.g. ams_campaigns_asin_workbench). filterEntities: [filter column, source column, optional join column]. commonFilterEnabled can be set per-bundle and overrides top-level or cube JSON.
+
+**Schema management (DDL):** Repo `databricks-schema-management`. Path: `resources/db_migration/ESM/CLIENT_CATALOG/<SCHEMA>/`. File naming: `YYYY_MM_DD__<action_description>.yaml`. Branch: JIRA ticket ID (e.g. BIPLATFORM-580-description).
+
+**Execution Environments:**
+
+**Lessons:** (1) Verify data assumptions (e.g. “IDs unique per tenant”) with real queries before stating as fact. (2) Cluster size can mask inefficiency (same plan runs faster on LARGE than X_SMALL); optimize the plan, not only the cluster. (3) For JIRA description updates via API, pass markdown string; the tool converts to ADF.

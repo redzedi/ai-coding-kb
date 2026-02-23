@@ -19,7 +19,6 @@ description: Java coding and project handling guidelines and best practices
 
 
 
-
 - **Correct way to use jenv before running Maven:**
 	1. Run `jenv local 1.8` as a **separate command first** - this sets up JAVA_HOME properly
 	2. Then run Maven commands separately
