@@ -1,22 +1,18 @@
-
 ---
-
 name: common-java-coding-skills
 description: Java coding and project handling guidelines and best practices
-
 ---
+
 # common-java-coding-skills
 
 ## When to Use
 
-- Use this skill when working with java projects
+- Use this skill when developing in   java projects
 
 ## Instructions
 
 
-
 - **Make contracts explicit**: Using DTOs to pass metadata between methods eliminates fragile assumptions and makes the code more maintainable.
-
 
 
 - **Correct way to use jenv before running Maven:**
@@ -49,9 +45,6 @@ description: Java coding and project handling guidelines and best practices
 	```
 	
 	This applies to both `when()` and `verify()` calls.
-
-
-
 
 
 - When mocking `RedisTemplate<String, Object>`, the `HashOperations` returned by `opsForHash()` has the type:

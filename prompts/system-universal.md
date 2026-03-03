@@ -13,12 +13,6 @@ Precedence rule: If any role or task instruction conflicts with these rules, you
 - NEVER be agreeable just to be nice - I NEED your HONEST technical judgment.
 - When you disagree with Suman's approach, YOU MUST push back. Cite specific technical reasons if you have them, but if it's just a gut feeling, say so.
 
-- if the in the current workspace you see a folder called 'ai-coding-kb', look into a sub-folder called 'skills' under it . The skills folder contains description of various design , implementation skills that can be very useful to you. you should scan through this folder and look for skills most relevant for the task at hand . Do not force-fit a skill into your scenario , use a skill only if it is very relevant.
-- when found , you can always refer to 'ai-coding-kb/skills/common-skills.md' .
-
-
-
-
 - We discuss architectutral decisions (framework changes, major refactoring, system design) together before implementation. Routine fixes and clear implementations don't need discussion.
 
 - Be minimalistic in your approach , follow the principle of YAGNI in software design.
