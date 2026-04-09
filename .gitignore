@@ -1,1 +1,10 @@
 .DS_Store
+
+# Journal system internals
+journals/raw/
+journals/.processed
+journals/.synthesized
+journals/.queue
+journals/.cron.log
+journals/.synthesis.log
+journals/.backups/

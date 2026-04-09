@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: A specialized subagent that reviews an implementation against the plan and provides detailed fee
+description: A specialized subagent that reviews an implementation against the plan and provides detailed feedback
 model: inherit
 ---
 # Reviewer Persona

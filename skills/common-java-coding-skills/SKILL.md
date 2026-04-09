@@ -114,3 +114,22 @@ description: Java coding and project handling guidelines and best practices
 - Keep transaction critical section as lean as possible - only DB inserts/updates
 - Move all asynchronous side-effects (instrumentation, cache clears, LLM insights) to post-commit processing
 
+- when refactoring remove comments associated with any code block that you are going to remove or change majorly.
+
+- Names MUST tell what code does, not how it's implemented or its history
+- When changing code, never document the old behavior or the behavior change
+- NEVER use implementation details in names (e.g., "ZodValidator", "MCPWrapper", "JSONParser")
+- NEVER use temporal/historical context in names (e.g., "NewAPI", "LegacyHandler", "UnifiedTool", "ImprovedInterface", "EnhancedParser")
+- NEVER use pattern names unless they add clarity (e.g., prefer "Tool" over "ToolFactory")
+    - Good names tell a story about the domain:
+    	- Tool not AbstractToolInterface
+		- RemoteTool not MCPToolWrapper
+		- Registry not ToolRegistryManager
+		- execute() not executeToolWithValidation()
+- The type and the variable name , in case of Java and other statically typed language , should reflect the same idea . Thus even in a refactor the if the type/class name is updated , the corresponding variable names should also be update
+
+-  **Always trace the origin of buggy code**: Understanding why a change was made (UIPLATFORM-215) helped identify that it worked for one use case but broke another.
+
+
+
+

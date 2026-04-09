@@ -1,5 +1,5 @@
 ---
-name: implementer
+name: my-coder
 description: Executes technical plans by editing files and running basic terminal commands.
 skills: [common-java-coding-skills , common-skills]
 model: fast

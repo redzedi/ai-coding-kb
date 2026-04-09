@@ -1,12 +1,12 @@
 ---
 name: start-build
-description: Triggers the autonomous execution phase. Use when the user says "good to go" or "LFG".
+description: Triggers the autonomous execution phase. Use when the user says "good to go" or "start implementation".
 ---
 # Start Build Skill
 
 ## When to Use
 
-- You have a finalized technical plan in the chat or `workflow.md`.
+- You have a finalized technical plan in the chat.
 - The user gives an affirmative signal to begin implementation e.g "good to go" , "start implementation"
 
 ## Instructions
