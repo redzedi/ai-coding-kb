@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/sumanyadav/personal/projects/ai-coding-kb/journals/raw)",
+      "Bash(mkdir -p /Users/sumanyadav/personal/projects/ai-coding-kb/scripts)",
+      "Bash(chmod +x /Users/sumanyadav/personal/projects/ai-coding-kb/scripts/enqueue-session.sh)",
+      "Bash(/Users/sumanyadav/personal/projects/ai-coding-kb/scripts/collect-journals.sh:*)",
+      "Bash(python3:*)",
+      "Read(//Users/sumanyadav/.claude/**)",
+      "Bash(claude mcp:*)"
+    ]
+  }
+}

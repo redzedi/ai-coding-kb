@@ -1,0 +1,71 @@
+---
+title: "BI-Default Warehouse Cost Structure and Low-Parallelization Analysis"
+date: 2026-03-23
+role: analyst
+project: ciq-configservice
+ticket: BIPLATFORM-667
+tags: [databricks, cost-optimization, query-analysis, parallelization, warehouse-right-sizing]
+---
+
+# Key Learnings
+
+## Query Attribution Must Be Validated Before Cost Estimation
+
+The original $655/month estimate for cubesdk MAX(feed_date) queries was off by two orders of magnitude ($5/month actual). The root cause: pattern matching (`SELECT MAX(FEED_DATE)`) without validating the source system. 97.5% of matching queries came from unrelated services (vendor inventory batch, aramus catalog, CCP pipelines, dbt).
+
+**Rule:** Always discriminate by source system before cost attribution. For cubesdk, the reliable marker is the JSON metadata comment at the end of every query: `/**{...}**/`. Filter: `statement_text LIKE '%}**/'`.
+
+## Subquery Cost ≠ Full Query Cost
+
+When a MAX(feed_date) is embedded as a subquery in a larger analytical query, eliminating it only saves the marginal compilation/execution overhead — not the full query cost. The standalone MAX query costs ~$0.000174 per execution; the full query it's embedded in costs ~$0.02. The marginal saving is roughly the standalone cost.
+
+## Low-Parallelization Ratio as Anti-Pattern Detector
+
+`total_task_duration_ms / execution_duration_ms < 2` is an effective heuristic for finding queries that don't benefit from distributed compute. On the BI-default warehouse, 90.4% of queries fell in this bucket (though consuming only 17.7% of compute).
+
+Sub-patterns found:
+- **Single-row lookups** (client_id by name, UDAP retailer mappings): 2,944/day, returning 0-1 rows. Classic RDS/cache candidates.
+- **Metadata queries** (catalog_metadata, taxonomy_metadata): 3,298/day, ~10 rows of static config. App-layer cache.
+- **Min/max date range queries**: 2,023/day, scanning 1.17M rows to return 2 values. `calender_dates` RDS already has this data.
+- **Repeated identical queries** (filter_metadata SMART_FILTERS): same query hundreds of times, 0 rows. Process-level cache.
+
+## Consistent Daily Counts Signal Batch Jobs
+
+Pattern 1 queries had ~3,400/day with <5% day-over-day variance. This consistency was the clue that it was a scheduled batch job (vendor inventory), not interactive traffic whose volume would vary with user activity.
+
+## Cost Calculation Formula
+
+The proper per-query cost uses weighted DBU allocation:
+```
+cost = usage_quantity * (
+  task_ms * 0.8 / sum_task_in_hour +
+  exec_ms * 0.15 / sum_exec_in_hour +
+  compile_ms * 0.05 / sum_compile_in_hour
+) * list_price * (1 - discount_pct / 100)
+```
+
+Must run on `user-dbx-dev` MCP server — discount table (`admin_catalog.account_usage.dbx_discounts`) is only available there, though `system.query.history` and `system.billing.usage` work on both dev and prod.
+
+## Warehouse Cost Cross-Cut (Parallelism x Origin)
+
+The most revealing analysis of the BI-default warehouse ($10,077/month total):
+
+- 90% of queries are low-parallelization but only 32% of cost
+- 10% of queries are high-parallelization and command 68% of cost
+- cubesdk ecosystem (direct + indirect) is 51% of queries but 86% of cost
+- non-cubesdk is 49% of queries but only 14% of cost
+
+Largest addressable opportunity: **low-parallel cubesdk queries ($2,247/month)** — real analytical queries on small client datasets where a MEDIUM warehouse is overkill. Warehouse right-sizing (routing to X_SMALL) is the lever, not caching or query elimination.
+
+The non-cubesdk low-parallel queries ($541/month) include classic anti-patterns: single-row lookups (2,944/day), metadata queries (3,298/day returning ~10 rows), min/max date ranges already in RDS (2,023/day), and repeated identical queries returning 0 rows.
+
+## Warehouse ID Reference
+
+| ID | Name | Type |
+|---|---|---|
+| `de174e171ce90e15` | BI-default | MEDIUM, interactive |
+| `97dbb31eee7ddde6` | (batch) | hosts vendor_inventory + refresh_logs |
+| `133726346e29d874` | (batch) | hosts vendor_inventory + cubesdk_preflight |
+| `3334809b21f2e385` | (aramus) | hosts aramus_catalog (largest cost) |
+| `516bae2db745259c` | bi_offline | |
+| `d9369c57eb514078` | rmm_etl_wh | X_SMALL |

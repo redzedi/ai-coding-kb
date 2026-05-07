@@ -7,7 +7,7 @@ set -euo pipefail
 KB_DIR="$HOME/personal/projects/ai-coding-kb"
 RAW_DIR="$KB_DIR/journals/raw"
 PROCESSED="$KB_DIR/journals/.processed"
-PROJECTS_ROOT="$HOME/personal/projects"
+PROJECTS_ROOT="$HOME/projects"
 
 mkdir -p "$RAW_DIR"
 touch "$PROCESSED"
