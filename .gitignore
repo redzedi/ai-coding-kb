@@ -8,3 +8,5 @@ journals/.queue
 journals/.cron.log
 journals/.synthesis.log
 journals/.backups/
+__pycache__/
+*.pyc
