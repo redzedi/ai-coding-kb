@@ -15,9 +15,10 @@ description: >-
 
 Use this skill when given a CCP workflow name and asked to:
 - Investigate why a Databricks job compute workflow is expensive
-- Find and quantify wasted compute from failures, stuck runs, or over-provisioning
+- Find and quantify wasted compute from failures, stuck runs, over-provisioning etc
 - Produce a cost optimization analysis with actionable hypotheses
 - Identify runaway jobs and propose timeout thresholds
+- brainstorm to generate qualified ideas to reduce cost for the given wf
 
 ## Prerequisites
 
@@ -29,6 +30,11 @@ Use this skill when given a CCP workflow name and asked to:
   - **`plugin-atlassian-atlassian`** for Jira/Confluence discovery
   - **`user-bitbucket4`** with workspace `commerceiq` for repo search
 - Prod workspace IDs: `6609267921842809`, `1086031994956170`, `2986176579409100`
+
+## Phase 0: Preparation
+
+- create a work-dir for this analysis in `cursor-analysis`. The name pattern for that director is `<wf name>_cost-opt_<dd-MM-yyyy>`
+- create a worktree from master for your analysis
 
 ## Phase 1: Context Discovery
 
@@ -47,6 +53,23 @@ Given only a workflow name, build understanding of what it does and where the co
 - Identify the entry point (usually in `entrypoint/`)
 - Understand the fan-out pattern: does an orchestrator spawn multiple generator/worker runs?
 - Note: cluster config, parallelism settings, key libraries (Prophet, Spark ML, etc.)
+
+### Step 4: Find out the upstream
+
+- ccp etl wf are generally triggered by upstream data ingestion orchestrator  like airflow or azkaban, use bitbucket code search to figure out the repo and specific workflow that triggers this ccp wf.
+- Analyze the grain trigger , are the triggers per client ? combination of retailer ,client , region etc
+
+### Step 5: Find out the domain context
+
+- Each ETL wf produces some data that is used to power one or more expereiences( metric pages) in ciq client facing products , identify these products by using code search with the output table names .
+
+### Step 6: Create a dependency graph of modules in the workflow
+
+- **Discover DAG for the current wf** -- CCP wf especially SQL wf are defined in terms of modules that  have dependency on other modules . Discover the DAG for the current wf. Check AGENTS.local.md if the DAG for this wf is already available
+
+- **Discover the wf in the repo impacted** -- Find out all wf definitions in the repo that include any of the modules of the current wf . THese other wf are in the regression impact path
+  
+- **Add or Update the DAG details in AGENTS.local.md** -- for future reference
 
 ## Phase 2: Cost Profiling
 
@@ -207,8 +230,27 @@ ORDER BY usage_start_time
 
 Multiple entries per hour = multiple nodes (driver + workers). Continuous hourly entries with no gaps = cluster stayed fully provisioned.
 
+### Step 7: Find the distribution of wf runtimes by tenant
+
+- Find out median , p95, p99 , max runtimes by client_id . Find the top 10 clients by median and p95 values.
+- If there is a time window provided and the timewindows are variable , then find the same distribution for the combination of client_id + time_window.
+
 ## Phase 3: Analysis Patterns
 
+This is where you brainstorm for ways to reduce cost . Each recommendation is a hypothesis derived from some evidence observed in the context collected so far . 
+
+*Each hypothesis should be verifiable* . With each hypothesis propose a plan to test it , with quantitative threshold that proves or disproves the hypotheses. 
+
+*The following list of patterns is not exhuastive, it is just the usual set of analysis that were done in other cases* . Remember each wf is unique so which analysis applies for a particular case depends on the specific context .
+
+Here being creative, thinking out of the box helps .
+
+create an intermediate document `temp_recommendations_<version number starting from 1>.md`, withe following details at the end of this Phase to document the findings -
+
+```
+  | reccomendation | reccomendation type(code | config | architecture) | why this helps ? | expected saving in $/month |
+
+```
 ### Pattern A: Timeout Analysis
 
 When failures consume significant cost:
@@ -227,6 +269,7 @@ When a small % of runs consume disproportionate cost:
 2. **Quantify the cost share** — what % of total cost comes from these runs?
 3. **Examine the code** — what determines run duration? (combination count, data volume, model complexity)
 4. **Propose code-level fixes** — lighter models, better batching, early-exit for low-value work
+5. **Lead with Hypothesis** -- for each code level fix recommendation , quantify the expected benefit in terms of total execution time saving and the hypothesis statement of what is causing the perf gain . This provides a grounding to objectively validate these recommendations later.
 
 ### Pattern C: Volume Reduction
 
@@ -288,6 +331,8 @@ the team gains confidence to proceed with riskier phases.
 
 ### Pattern F: Tiered Compute Profiling
 
+Include upstream(triggering side) information for this too , the recommendation might be batching or some pre-trigger work in upstream.
+However , these recommendations will have high complexity now because of the sensitive nature of the data ingestion orchestrators.
 When a workflow serves heterogeneous clients with 10-100× variation in data volume:
 
 1. **Identify the volume dimension** — what input characteristic drives runtime? (row count, combination count, model count)
@@ -299,11 +344,41 @@ When a workflow serves heterogeneous clients with 10-100× variation in data vol
 This right-sizes compute for 80%+ of runs (typically small) while maintaining headroom
 for heavy-hitter clients. Often saves 30-50% vs flat sizing for the worst case.
 
-## Phase 4: Output
+### Pattern G: Multi-module analysis
+
+Workflows might consist of multiple intermediate modules. Look a across modules for cross cutting patterns. Remember security concerns are paramount .
+
+- **Same source tables scanned multiple times in various modules** -- Look for opportunities of merging modules , using temp views in SQL workflows . Be mindful of hte high complexity though
+
+- **Data shape by upstream modules** -- An intermediate module might be able to leverage the data shpae ( e.g distinct rows) of the data emitted by upstream and forego those expensive checks in its own code.
+
+- **Intermediate modules might be shared, AVOID REGRESSION AT ALL COST** -- a recommendation for an intermediate module might cause a regression when used from another workflow . Find out   all workflows that use any of the modules that are impacted by our proposed changes so far . Analyse the impact on each of those wf of the change . Only include a recommendation if it is absolutely safe . The recommendations that are categorized as non-safe should be documented separately 
+
+## Phase 4: Low level design for the SQL optimization recommendations
+
+Create a document `temp_sql_lld.md`
+
+- **For each SQL optimization reccomendation from the previous Phase** --
+  - - **Generate and document the low level design** -- Create a section in the lld document. Add real code snippets such that an agent can directly implement these with minimum effort and no ambiguity reading this document.
+
+
+
+## Phase 5: Validate SQL optimization recommendations
+
+Applies for SQL wf only .
+
+- **For each unvalidated SQL optimization reccomendation** --
+  - **Create new worktree from master**
+  - **Do the changes in the .vtl files**
+  - **invoke 'ccp-workflow-experiment'** -- with arguments `is_vtl_file_changes_done`=F and map of parameters needed to run the resultant query . use the top client_id by p95 runtime as detected above and other parameter values for corresponding run from prod
+  - **Compare experiment observations with expected gain**. -- if the actual observed execution time improvement is lesser than expected gain by more than 20-25% , the hypothesis and recommendation stands invalidated.
+  - **Create New SQL recommendations from the clues uncovered in the observed query profile** - The analysed query profile might uncover newer possibilities that were not considered before , those ideas should be analyzed and captured to the list of unvalidated reccomendations to be validated. Add the corresponding lld in the `temp_sql_lld.md` ( see ## [Phase 4](./##Phase ) above)
+
+## Phase 6: Output
 
 ### Analysis Document
 
-Create in `cursor-analysis/` with this structure:
+Create in the work-dir with this structure:
 
 ```
 # <Workflow Name> — Cost Optimization Plan
@@ -351,6 +426,10 @@ Structure as independently shippable phases (see Pattern E):
 ## Input/Output Data Profile (if heterogeneous clients)
 [Client volumes, tier definitions for Pattern F]
 
+## Other Optimizations considered
+
+| Name | Description | Effort level | Savings/month | why not recommending ? |
+
 ## Sample Run IDs for Investigation
 [Organized by failure type and duration bucket]
 
@@ -368,26 +447,23 @@ Create in the relevant project. Keep concise and data-driven:
 
 Add labels: `cost-optimization`, `databricks`
 
-## Key System Tables Reference
+### Discovered Data
 
-| Table | What It Tells You | Key Columns |
-|---|---|---|
-| `system.lakeflow.jobs` | Job definitions | `job_id`, `name` |
-| `system.lakeflow.job_run_timeline` | Run-level timeline | `job_run_id`, `period_start_time`, `result_state` |
-| `system.lakeflow.job_task_run_timeline` | Task-level detail | `execution_duration_seconds`, `result_state`, `termination_code`, `task_parameters` |
-| `system.billing.usage` | Hourly DBU consumption | `usage_quantity`, `usage_metadata` (job_id, job_run_id, cluster_id) |
-| `system.billing.list_prices` | SKU list prices | `pricing.default`, `sku_name` |
-| `system.compute.clusters` | Cluster lifecycle | `create_time`, `delete_time`, `cluster_name`, node types |
-| `admin_catalog.account_usage.aws_cost_metrics_tags` | AWS infra cost by workflow tag | `tag_value`, `cost`, `start_date` (dbx-dev only) |
+THere should one consolidated document called `misc_<ddMMYYYY>.md` in the workdir , containing all important context data discovered in the process of this investigation . THese data will be useful in the next phases of the uber workflow . 
+The document is expected to contain the following ( but not limited to these only ) --
+ 
+ - runtime distribution by client and other input parameter combinations
+ - run volume and duration distribution
+ - failure profile 
+
+### Consolidated LLD document for the valid SQL code change reccomendations
+
+copy over from `temp_sql_lld.md` document created in Phase 4.
+
+
 
 ## Important Notes
 
-- **MCP server selection**: Use `user-dbx-dev` for queries involving `admin_catalog`. Use either for `system.*` tables.
-- **Discount factor**: 0.57 on Databricks list price is the CIQ contracted rate. Verify if this changes.
-- **DBU ≠ total cost**: Databricks catalog prices (e.g., r5d.8xlarge = $1.44/hr) are **DBU-only**. AWS EC2 cost is billed separately and is typically ~2× the discounted DBU cost. Total hourly cost ≈ (DBU_list × 0.57) + EC2 ≈ DBU_list × 0.57 × 3. When proposing instance changes, always estimate both components. The EC2 portion (~67% of total) does not benefit from the Databricks enterprise discount.
-- **AWS cost gaps**: The `aws_cost_metrics_tags` table may have missing dates. Treat as lower bound.
-- **Ephemeral clusters**: CCP job compute workflows use per-run ephemeral clusters. Each run = one dedicated cluster. Stuck jobs keep the full cluster (driver + all workers) provisioned and billed continuously.
-- **`job_task_run_timeline` gotcha**: `execution_duration_seconds` is 0 on intermediate hourly rows. Only terminal rows (`result_state IS NOT NULL`) have the full duration.
-- **Databricks Serverless ≠ cheap for I/O-bound work**: Serverless job compute bills for allocated driver resources × wall-clock time, not CPU utilization. For workloads that are 95% idle on CPU (waiting on API calls), you pay full provisioned-driver price for hours of HTTP wait. SQL Serverless is different — it bills per query, making it efficient for actual SQL work.
-- **Arrow serialization OOM**: `toPandas()` with Arrow optimization can OOM even when JVM heap graphs show low utilization. Root cause: `ByteArrayOutputStream.toByteArray()` creates a transient copy, doubling memory for the duration of the copy. A 2 GB Arrow batch needs 4 GB transiently. Heap monitoring captures steady-state, not instantaneous spikes. Spark falls back to non-Arrow `toPandas()` after retries, but this is slower.
-- **SQL push-down as memory enabler**: Consolidating multiple `spark.sql().toPandas()` calls into a single server-side query reduces not just I/O time but the in-memory DataFrame size (often 99%+ reduction). This can be the prerequisite for instance downsizing — evaluate push-down for both time AND memory impact.
+- **Parent-Child View Collapsing**: Always inspect underlying source views (e.g., `catalog_listing_view`) for joins with parent-child metadata tables (like `ARAMUS.AVC_CLIENT_PARENT_CHILD_MAPPING`). These views may resolve all child client rows under a parent client ID, meaning many of the child runs triggered separately will result in zero-row data operations.
+
+

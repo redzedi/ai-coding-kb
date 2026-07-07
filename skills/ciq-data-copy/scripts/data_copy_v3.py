@@ -47,11 +47,18 @@ def _to_api_payload(request: Dict) -> Dict:
     So tables[] passes through unchanged from the user config, only the
     three top-level fields need renaming.
     """
+    tables = []
+    for t in request.get("tables", []):
+        t_copy = dict(t)
+        if "clients" in t_copy and "client_ids" not in t_copy:
+            t_copy["client_ids"] = t_copy.pop("clients")
+        tables.append(t_copy)
+
     return {
         "sourceEnv": request["source_env"],
         "targetEnv": request["target_env"],
         "requestedBy": request.get("requested_by", DEFAULT_USER),
-        "tables": request.get("tables", []),
+        "tables": tables,
     }
 
 
@@ -114,7 +121,9 @@ def poll_until_done(request_id: str,
             f"failed={summary.get('failed', '?')}  "
             f"in_progress={summary.get('in_progress', '?')}"
         )
-        if state in TERMINAL_STATES:
+        tasks = status.get("tasks", [])
+        non_terminal_tasks = [t for t in tasks if t.get("status") not in {"COMPLETED", "FAILED", "VALIDATION_FAILED"}]
+        if state in TERMINAL_STATES and not non_terminal_tasks:
             return status
         poll_count += 1
         time.sleep(interval)
@@ -147,7 +156,7 @@ def build_verification_queries(request: Dict, status: Dict) -> List[Dict]:
         table_name: str = task["table_name"]
         cfg = table_configs.get(table_name, {})
 
-        clients: List[str] = cfg.get("clients", [])
+        clients: List[str] = cfg.get("clients", []) or cfg.get("client_ids", [])
         date_filter: Dict = cfg.get("date_filter", {})
         column_filters: Dict = cfg.get("column_filters", {})
 
@@ -306,7 +315,7 @@ def main() -> None:
         n_tables = len(request.get("tables", []))
         _log(f"Triggering copy: {src} → {tgt}  ({n_tables} table(s))")
         for t in request.get("tables", []):
-            clients = t.get("clients", [])
+            clients = t.get("clients", []) or t.get("client_ids", [])
             df = t.get("date_filter", {})
             date_str = (
                 f"{df['start_date']} → {df['end_date']}" if df else "no date filter"

@@ -28,13 +28,13 @@ collect_file() {
 # 1. Collect from cursor-analysis/ folders in all sibling projects
 find "$PROJECTS_ROOT" -maxdepth 4 -type d -name "cursor-analysis" | while read -r dir; do
   project=$(basename "$(dirname "$dir")")
-  find "$dir" -maxdepth 2 -type f \( -name "*.md" -o -name "*.txt" \) | while read -r f; do
+  find "$dir" -maxdepth 2 -type f -name "journal-*" | while read -r f; do
     collect_file "$f" "$project"
   done
 done
 
 # 2. Also collect journals already in ai-coding-kb/journals/ (non-raw)
-find "$KB_DIR/journals" -maxdepth 1 -type f -name "*.md" | while read -r f; do
+find "$KB_DIR/journals" -maxdepth 1 -type f -name "journal-*" | while read -r f; do
   collect_file "$f" "ai-coding-kb"
 done
 

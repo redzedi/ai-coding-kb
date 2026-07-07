@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+description: Global agent knowledge base router
+---
+Before substantive work, read `~/personal/projects/ai-coding-kb/ciq-kb-index.md`.
+Load files from `~/personal/projects/ai-coding-kb/ciq-kb/` only when the current task matches a kb( knowledge base) item listed there.
+Do not duplicate kb content in chat; read the source file.
+Load file from `~/personal/projects/ai-coding-kb/journals/tool-prefs.md`. This contains info on tools you can use.

@@ -88,7 +88,7 @@ Create a JSON config that describes the copy. Save it to `cursor-analysis/` (git
 
 **Choosing `copy_mode`:**
 - Use `APPEND` when adding new date ranges to existing target data.
-- Use `OVERWRITE` only when you want a clean slate — it truncates the target partition first.
+- Use `OVERWRITE` only when you want a clean slate — it truncates the target partition first. **ATTENTION: Check with Suman before using this, explain him the risks !!**
   For `client_catalog` tables partitioned by `client_id`, overwrite clears data for ALL copied clients.
 
 ## Phase 2: Trigger and Poll

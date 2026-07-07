@@ -281,7 +281,7 @@ Do first-level analysis only. Ask Suman if he wants to go deeper on any specific
 
 ## Step 7: Right-Sizing Analysis
 
-Read and follow the `right_size_databricks_warehouse` skill (at `~/.cursor/skills/right_size_databricks_warehouse/SKILL.md`) to produce:
+Read and follow the `right_size_databricks_warehouse` skill (at `~/ai-coding-kb/skills/right_size_databricks_warehouse/SKILL.md`) to produce:
 
 1. Workload profiling (online vs offline)
 2. Concurrency distribution
@@ -329,6 +329,7 @@ Include the previous month's attributed cost as a baseline column. Prioritize by
 - **Tier 2: Query Optimization** (SQL changes, materialized views)
 - **Tier 3: Infrastructure** (warehouse sizing, splitting workloads)
 
+
 ---
 
 ## Important Gotchas
@@ -343,7 +344,7 @@ Include the previous month's attributed cost as a baseline column. Prioritize by
    - `system.compute.warehouses`: size column is `warehouse_size` (not `cluster_size`)
    - `system.query.history`: use `statement_id` (not `query_id`)
 
-4. **Discount table**: `admin_catalog.account_usage.dbx_discounts` may not exist in all workspaces. If it fails, omit the discount join and note costs are at list price.
+
 
 5. **New warehouse "spike" framing**: Always normalize to daily rates when a warehouse was created mid-period. A 14x month-over-month increase might just be 3 days vs 31 days.
 
@@ -358,3 +359,13 @@ Include the previous month's attributed cost as a baseline column. Prioritize by
      AND status != 'FINISHED'
    GROUP BY 1
    ```
+
+--
+
+## Guidelines
+
+- **Parallelization Factor (PF) 10 ≈ 1 Databricks worker node**: PF < 80 → Medium (8 workers); PF 80–160 → Large; PF > 160 → X-Large.
+- **max_clusters cap**: `max_clusters=40` on always-on warehouse = worst case 40 × 40 DBU/hr = 1,600 DBU/hr ($638/hr). Cap at 5–8 for Large. Saves $1K–3K/month with no functional impact.
+- **X-Large → Large downsize**: $10K–12K/month savings, zero code change. Medium sizing blocked until high-PF queries are optimized first.
+- **5.8% of queries can carry 56% of compute work**: Optimize the heaviest queries before downsizing cluster — wrong order causes P95 regression 1.3–2x.
+- **`total_task_duration_ms / execution_duration_ms < 2`** is an effective heuristic for detecting queries that don't benefit from distributed compute — good candidates for RDS/cache offload.

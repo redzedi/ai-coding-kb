@@ -1,13 +1,6 @@
----
-name: ciq_bi-platform_debug
-description: Access of prod apis, access of databricks data while debugging BI platform projects `brands-service`, `cubesdk`, `dashboard-service` etc. 
----
-# CIQ BI Platform debug skill
+# bi-workflow
 
-## When to Use
-
-Use this skill when debuging or exploring ciq BI platform related flows like working with projects `brands-service`, `cubesdk`, `dashboard-service` etc. 
-
+- 
 ## Accessing the Prod apis
 
 - `dashboard-service` api in prod can be hit using curl through terminal , following is a sample of a reporting v1 call . The reponse contains a header called `Response_token` that value can be used to search logs through groundcover mcp server to fetch logs . Calls to `brands-service` are logged . Adjust request path and payload as per the flow under investigation.
@@ -622,104 +615,12 @@ curl --location 'http://brands-service.prod-dbx.commerceiq.ai/cube/execute' \
               `qa` --> 5482606822854295 THEN 'qa'
               `prod` --> (6609267921842809, 1086031994956170, 2986176579409100, 3311307628646430
 
-## Data sync from prod to dev
 
-- Data sync tool can be used to pull in latest data from prod databricks table to dev. This is useful for analysis.
-- The tool exposes an async api to submit a task for 1 or more table update request . The request is per client_id and date range based . Following is the sample for a sync request submission -
-
-```sh
-
-
-curl 'http://data-copy-service.commerceiq.ai/data-copy/' \
-  -H 'Referer: http://data-copy-service.commerceiq.ai/docs' \
-  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  --data-raw $'{
-      "sourceEnv": "prod",
-      "targetEnv": "beta",
-      "tables":
-      [
-          {
-              "tableName": "client_catalog.SELLER_CUBES.SKU_DATA",
-              "clients":
-              [
-                  1007
-              ],
-              "dateFilter":
-              {
-                  "param": "feed_date",
-                  "startDate": "2025-06-01",
-                  "endDate": "2025-09-30"
-              },
-              "skipColumns":
-              [],
-              "copyFilters":
-              {},
-              "copyMode": "APPEND"
-          },
-          {
-              "tableName": "client_catalog.AMS_CUBES.CAMPAIGNS_ASIN_WORKBENCH",
-              "clients":
-              [
-                  1007
-              ],
-              "dateFilter":
-              {
-                  "param": "feed_date",
-                  "startDate": "2025-06-01",
-                  "endDate": "2025-09-30"
-              },
-              "skipColumns":
-              [],
-              "copyFilters":
-              {},
-              "copyMode": "APPEND"
-          },
-          {
-              "tableName": "client_catalog.seller_cubes.client_internal_catalog",
-              "clients":
-              [
-                  1007
-              ],
-              "dateFilter":
-              {
-                  "param": "creation_date",
-                  "startDate": "2024-05-20",
-                  "endDate": "2025-12-31"
-              },
-              "skipColumns":
-              [],
-              "copyFilters":
-              {},
-              "copyMode": "APPEND"
-          }
-      ]
-  }'
+## BI dataflow
 
 ```
-
-- the response of the above query is as follows- 
-
-```json
-{
-    "result": "ACCEPTED",
-    "message": "Accepted",
-    "details": {
-        "requestId": "R1620507a475749e79749006f20c41c2c"
-    }
-}
-
+UI → dashboard-service (V1: /entity/metrics/data, V2: /data)
+   → brands-service (/cube/execute, cubesdk generates SQL)
+   → Databricks SQL Warehouse
 ```
-
-- This requestId can subsequently be used in job status lookup query as follows to figure out if the job is completed. 
-
-```sh
-curl -X 'GET' \
-  'http://data-copy-service.commerceiq.ai/data-copy/status/R1620507a475749e79749006f20c41c2c' \
-  -H 'accept: application/json'
-
-  ```
-
-
-
+- dashboard-service is API gateway; brands-service loads cube JSON and generates SQL via cubesdk.

@@ -1,0 +1,48 @@
+---
+title: "Distributed Request Coalescing Savings and Lessons"
+task: "occ-saving"
+role: "programmer"
+date: "2026-03-24"
+jira: "BIPLATFORM-663"
+tags: ["cost-optimization", "redis", "coalescing", "stampede", "databricks"]
+---
+
+# Journal: Distributed Request Coalescing (OCC) Savings & Lessons
+
+## Context & Background
+
+During high-concurrency peak hours on the Databricks SQL Warehouse `dsa_reporting_wh` (`fcf485c1acd18e10`), the application experienced a severe **thundering herd / cache stampede** problem. Concurrent scorecard dashboard page loads spawned identical, extremely expensive, non-cached queries in parallel, resulting in massive redundant billing on Databricks ($18,920.47 in March 2026 alone).
+
+We designed and implemented a distributed request coalescing solution using Redis-backed locks (`RequestCoalescer`). When multiple identical requests arrive concurrently:
+1.  The leader acquires a Redis lock and executes the heavy query.
+2.  The followers wait and poll Redis for the populated cache.
+3.  Once the leader writes the result, all followers read directly from Redis, bypassing Databricks.
+
+## Key Technical Lessons & Patterns
+
+### 1. Spring Data Redis `RedisTemplate` Serialization Pitfalls
+*   **Problem:** If the shared `RedisTemplate` is configured with `JdkSerializationRedisSerializer` for values (common in legacy Spring Boot apps), high-level operations like `opsForValue().setIfAbsent` and `execute(DefaultRedisScript)` serialize values/arguments using binary JDK serialization.
+*   **Failure Mode:** This binary serialization breaks Redis's internal expectations. For instance, passing an integer string like `"30"` (for lock TTL) serialized as binary JDK bytes to a Lua script causes `redis.call('expire', KEYS[1], ARGV[2])` to fail with `ERR value is not an integer or out of range`, as Redis cannot parse JDK binary headers as an integer.
+*   **Solution (Direct Byte Interaction):** Bypass `RedisTemplate`'s default serializers for lock operations by executing raw `RedisConnection` commands via `redisTemplate.execute(connection -> ...)` with explicit UTF-8 `byte[]` parameters:
+    *   `connection.stringCommands().set(keyBytes, valueBytes, Expiration.seconds(...), SetOption.ifAbsent())`
+    *   `connection.scriptingCommands().eval(scriptBytes, ReturnType.INTEGER, 1, params)`
+
+### 2. Transactional Scope Safeguards
+*   **Rule:** **NEVER** run distributed locks or request coalescing inside Spring `@Transactional` boundaries when transaction support is enabled on the `RedisTemplate`.
+*   **Reason:** Spring Data Redis queues Redis commands within active database transaction boundaries, executing them only upon transaction commit. This breaks lock safety entirely, as locks are not acquired immediately, causing other threads to bypass coalescing and flood the database.
+*   **Mitigation:** Explicitly document the class/methods to prevent transactional wrapping and keep lock blocks as lean as possible.
+
+### 3. Number Widening for Lua Script Returns
+*   **Rule:** When evaluating Lua scripts in Spring Data Redis, always widen the return type check using `Object result = connection.scriptingCommands().eval(...)` and check if `result instanceof Number` rather than casting directly to `Long`.
+*   **Reason:** Different Redis drivers or Spring Data versions can return different numeric types (like `Long`, `Integer`, or `Double`) for Lua script returns (which return standard Redis integers). Checking for `Number` and calling `.longValue()` avoids runtime `ClassCastException`s.
+
+## Financial & Optimization Summary
+
+A detailed query audit of the `dsa_reporting_wh` for March 1 - March 31, 2026, revealed the following:
+*   **Total March Warehouse Cost:** **$18,920.47** (632,363 queries)
+*   **Scorecard-specific Queries (`client_id in` filter):** **$18,644.13** (611,546 queries) — representing **98.5% of total warehouse cost**.
+*   **Top Cost Driver:** Client `1729` (Coca-Cola) alone spent **$4,876.64** (26.2% of scorecard queries).
+*   **Projected Monthly Savings:**
+    *   **Conservative Case (43% preventable duplication):** **$8,016.98 / month** (~$96,204 / year)
+    *   **Moderate Case (55% preventable duplication):** **$10,254.27 / month** (~$123,051 / year)
+    *   **High-Contention Case (70% preventable duplication):** **$13,050.90 / month** (~$156,611 / year)

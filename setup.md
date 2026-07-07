@@ -266,7 +266,7 @@ Write this file to ~/.claude/CLAUDE.md
 
 <!-- Auto-loaded at every session start -->
 
-@/Users/sumanyadav/personal/projects/ai-coding-kb/AGENT.md
+@/Users/sumanyadav/personal/projects/ai-coding-kb/AGENTS.md
 @/Users/sumanyadav/personal/projects/ai-coding-kb/journals/MEMORY.md
 ```
 

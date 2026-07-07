@@ -31,7 +31,7 @@ def get_unprocessed():
     if SYNTH_LOG.exists():
         synth = set(SYNTH_LOG.read_text().splitlines())
     files = []
-    for f in sorted(RAW_DIR.glob("*.md")):
+    for f in sorted(RAW_DIR.glob("*")):
         h = hashlib.md5(f.read_bytes()).hexdigest()
         if h not in synth:
             files.append((f, h))
