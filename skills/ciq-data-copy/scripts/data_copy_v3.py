@@ -55,9 +55,9 @@ def _to_api_payload(request: Dict) -> Dict:
         tables.append(t_copy)
 
     return {
-        "sourceEnv": request["source_env"],
-        "targetEnv": request["target_env"],
-        "requestedBy": request.get("requested_by", DEFAULT_USER),
+        "source_env": request["source_env"],
+        "target_env": request["target_env"],
+        "requested_by": request.get("requested_by", DEFAULT_USER),
         "tables": tables,
     }
 

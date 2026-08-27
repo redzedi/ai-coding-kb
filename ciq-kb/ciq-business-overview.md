@@ -33,6 +33,8 @@ RMM --> key metrics --  ROAS, iROAS , SOV, Glance Views(ppl opened the PDP but d
 Copilot // Control Centre -- this is all about controlling 2 levers -- Cost and visit. This all about analytics + insights + recommendations  , kind of a analytics layer on top of RMM+DSA data .
 There is a also a plan to standardize//generalize this product . A brand that has RMM from some other company should also be able to integrate that with Control Centre.
 
+* Client are structured in a 2 level hierarchical system. When a new client is onboarded a parent client_id and 1 or more children client_id are created . The client_id are integer values and is the primary identifier of the client in the system , product level registrations//associations( e.g avc report client mapping ) are maintained at child client_id level , the client facing surfaces use the parent client_id . The relationship is maintained in databricks at `aramus.client_details` table , most data access queries need to account for this indirection by joining their target table with a data flattening self-join on client_details to pull in all data associated with the child client id. Child client_id can be created for various region+retailer combination that belong to the same ciq client relationship.
+
 # Product View
 
 https://docs.google.com/document/d/1N6kZbFtmBq8PV4wIeJ4r4J0WXzTiw4ENMc5erjpdQ0E/edit?tab=t.0 
@@ -61,6 +63,18 @@ https://docs.google.com/document/d/1N6kZbFtmBq8PV4wIeJ4r4J0WXzTiw4ENMc5erjpdQ0E/
 
 
 category data comes from scraping others
+
+## Digital Shelf
+
+  consists of --
+
+   - Market Insights -- Share of Voice by market segment, product  etc
+   - MarketShare
+   - Reviews and Rating
+   - Price War
+   - Content Scorecard ( dsa )
+
+* The view is different in [[##Omni]] view 
 
 ## MarketShare
 
@@ -110,3 +124,12 @@ category data comes from scraping others
     - athena_aramus-platform -- microservices for client facing experiences like recommendation page -- also surfaced in OCC .
     - athena_aramus-workflow -- azkaban workflow for triggering the ETL
     - custom_pa_workspace , custom_brands_cubes etc -- CCP wf code
+
+## Omni
+
+This is a experience of the product for omni retailer i.e aggregate view across all retailers and countries. Here the left nav UI categories and product contents are differnt .
+There are experiences like  Digital Shelf Country Scorecard.
+In Omni there is a lots of variety from the Digital Shelf ( DSA product)
+
+
+

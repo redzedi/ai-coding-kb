@@ -85,22 +85,43 @@ ccp link
 
 **If `ccp link` fails:** retry once. If still failing, create a Jira in project `CR` with error details, inform Suman, and await instructions.
 
-Construct the trigger payload and save to `claude-analysis/<jira-id>/tracks/<track-id>/feature-payload.json`:
+Construct the trigger payload using CLI tools (avoids manual JSON construction):
 
-```json
-{
-  "clientName": "<brand-name>",
-  "executionEntityInfo": {
-    "branch": "<feature-branch>",
-    "name": "<workflow_name>",
-    "project": "<PROJECT_NAME>"
-  },
-  "sqlConfig": {"size": "SMALL"},
-  "executionVariables": [
-    {"name": "client_id", "value": "<client_id>"},
-    {"name": "rundate", "value": "<rundate>"}
-  ]
-}
+```bash
+# Set variables from test parameters
+JIRA="BIPLATFORM-123"
+TRACK="track-1"
+WORKFLOW="aws_prod_etl"
+PROJECT="PROJECT_NAME"
+BRANCH="feature-branch-name"
+CLIENT_ID="12345"
+RUNDATE="2026-06-19"
+BRAND="brand-name"
+
+# Build trigger payload via jq (avoids manual JSON editing)
+jq -n \
+  --arg clientName "$BRAND" \
+  --arg branch "$BRANCH" \
+  --arg workflow "$WORKFLOW" \
+  --arg project "$PROJECT" \
+  --arg client_id "$CLIENT_ID" \
+  --arg rundate "$RUNDATE" \
+  '{
+    clientName: $clientName,
+    executionEntityInfo: {
+      branch: $branch,
+      name: $workflow,
+      project: $project
+    },
+    sqlConfig: {size: "SMALL"},
+    executionVariables: [
+      {name: "client_id", value: $client_id},
+      {name: "rundate", value: $rundate}
+    ]
+  }' > claude-analysis/$JIRA/tracks/$TRACK/feature-payload.json
+
+# Verify the payload
+jq . claude-analysis/$JIRA/tracks/$TRACK/feature-payload.json
 ```
 
 Trigger:
@@ -167,11 +188,34 @@ Repeat Phases 3–5 for the master branch:
 
 1. Ensure you are on the master branch in the repo
 2. `ccp link` (master also needs linking each time — not permanently linked)
-3. Construct the control payload (same as feature but `"branch": "master"`)
-4. Save to `claude-analysis/<jira-id>/tracks/<track-id>/control-payload.json`
-5. `ccp trigger` with the control payload
-6. Monitor via background bash poll
-7. Save output to `client_view_catalog.temp_<client_id>.control_<track_id>_<output_table>`
+3. Construct the control payload via CLI (same variables as feature, but `branch: "master"`):
+
+```bash
+# Reuse the same variables and rebuild payload with master branch
+jq -n \
+  --arg clientName "$BRAND" \
+  --arg workflow "$WORKFLOW" \
+  --arg project "$PROJECT" \
+  --arg client_id "$CLIENT_ID" \
+  --arg rundate "$RUNDATE" \
+  '{
+    clientName: $clientName,
+    executionEntityInfo: {
+      branch: "master",
+      name: $workflow,
+      project: $project
+    },
+    sqlConfig: {size: "SMALL"},
+    executionVariables: [
+      {name: "client_id", value: $client_id},
+      {name: "rundate", value: $rundate}
+    ]
+  }' > claude-analysis/$JIRA/tracks/$TRACK/control-payload.json
+```
+
+4. `ccp trigger` with the control payload
+5. Monitor via background bash poll
+6. Save output to `client_view_catalog.temp_<client_id>.control_<track_id>_<output_table>`
 
 ## Phase 7: Report
 

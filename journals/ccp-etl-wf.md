@@ -117,3 +117,34 @@ Use bidirectional `EXCEPT` to prove query rewrites are equivalent:
 (SELECT cols FROM original) EXCEPT (SELECT cols FROM optimized)
 (SELECT cols FROM optimized) EXCEPT (SELECT cols FROM original)
 ```
+
+### Getting exact per-module timing from Groundcover (not CCP's own APIs)
+`ccp status --execution_id` only gives aggregate `totalTasks`/`finishedTasks`/`failedTasks` counts, no
+per-module breakdown. `ccp get-execution-logs --execution_id` is frequently broken/empty (returns
+malformed non-JSON, throws `JSONDecodeError` in the CLI). For real per-module timing, query Groundcover
+(cluster `ciq-apps-beta` for beta) for `CcpExecuteObservabilityHelper` log lines — these emit the exact
+duration CCP itself measured per task, no reconstruction needed:
+
+```
+cluster:ciq-apps-beta <execution_id> SUCCEEDED | fields _time, content | sort by (_time asc) | limit 150
+```
+
+Look for lines shaped like:
+`Task <task_id> in execution <execution_id> reached terminal state SUCCEEDED (prev=RUNNING, duration=<N>s, client=<name>, task=<module_name>)`
+
+and, for the whole workflow:
+`Workflow execution <execution_id> reached terminal state SUCCEEDED (prev=RUNNING, duration=<N>s, ..., workflow=<wf_name>)`
+
+This is the fastest, most reliable way to get a full module-by-module timing table for an A/B comparison —
+far better than trying to pair `DatabricksSQLQueryExecutor` "Submitting query"/`JobStatus(state=...)` log
+lines by statement ID (that works but is much more manual and error-prone). Bare-keyword searches
+(`SUCCEEDED`, `Completed`) work as expected in gcQL for logs; `state=SUCCEEDED` with the `=` inline did NOT
+match — use the bare keyword form instead.
+
+Also useful: CCP job-compute executions (`dbxExecutionMode=SQL_JOBCOMPUTE_NO_SPARK`) show up in Groundcover
+as a `DatabricksWorkflowRunnable` polling a wrapper Databricks Job (`pollJobStatus`, `jobId`/`runId`) before
+any module-level `DatabricksSQLQueryExecutor` SQL submission appears — a `RUNNING` state with 0 finished
+tasks for several minutes right after trigger is normal cluster/job startup, not a stuck run. The trigger's
+`jarParams` JSON (visible in the `DatabricksWorkflowRunnable:224 Triggering databricks job` log line) is also
+the definitive way to confirm which `executionVariables` (e.g. `rundate`) actually made it into the run,
+independent of what the trigger payload file said.

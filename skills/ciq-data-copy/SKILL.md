@@ -56,7 +56,7 @@ Create a JSON config that describes the copy. Save it to `cursor-analysis/` (git
   "tables": [
     {
       "table_name": "client_catalog.aramus.alert_sales_decrease",
-      "clients": ["1001", "1007"],
+      "client_ids": ["1001", "1007"],
       "copy_mode": "OVERWRITE",
       "date_filter": {
         "param": "feed_date",
@@ -80,7 +80,7 @@ Create a JSON config that describes the copy. Save it to `cursor-analysis/` (git
 | `target_env` | Yes | Must differ from source; see allowed routes |
 | `requested_by` | Yes | Defaults to `suman.y@commerceiq.ai` in the script |
 | `tables[].table_name` | Yes | Fully-qualified: `catalog.schema.table` |
-| `tables[].clients` | Yes for `client_catalog`; optional for `common_catalog` | List of client_id strings |
+| `tables[].client_ids` | Yes for `client_catalog`; optional for `common_catalog` | List of client_id strings |
 | `tables[].copy_mode` | Yes | `APPEND` — add rows without clearing target; `OVERWRITE` — truncate then insert (data loss risk!) |
 | `tables[].date_filter` | Yes for `common_catalog`; optional for `client_catalog` | `{param, start_date, end_date}` |
 | `tables[].column_filters` | No | `{"col": ["val1", "val2"]}` → `WHERE col IN (...)` |

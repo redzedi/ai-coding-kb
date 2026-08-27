@@ -25,16 +25,44 @@ description: >-
 - MCP: `user-bitbucket4` for PR creation (if using Bitbucket)
 
 ## Phase 1: Version Updates
-Check if version bumps are needed:
+
+Use CLI tools to automate version bumps (avoid manual edits):
 
 **For PySpark modules:**
-- Read `buildconfig.yaml` — check if `version` needs incrementing
-- Read the module YAML under `ccp-configs/pyspark/<module>/<module>.yaml` — update `pysparkExecutableConfig.version` to match
-- Follow semantic versioning: patch bump for optimization-only changes (e.g., `0.1.0` → `0.1.1`)
+
+```bash
+# 1. Check current version in buildconfig.yaml
+CURRENT=$(yq eval '.version' buildconfig.yaml)
+echo "Current version: $CURRENT"
+
+# 2. Bump patch version (semantic versioning: 0.1.0 → 0.1.1)
+NEWVER=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."($3+1)}')
+
+# 3. Update buildconfig.yaml
+yq eval ".version = \"${NEWVER}\"" -i buildconfig.yaml
+
+# 4. Update all matching module YAMLs in pyspark/ (verify first!)
+rg --type yaml 'pysparkExecutableConfig:' ccp-configs/pyspark/ --files-with-matches | \
+  xargs -I {} yq eval ".pysparkExecutableConfig.version = \"${NEWVER}\"" -i {}
+
+# 5. Verify changes
+echo "Updated to: $NEWVER"
+git diff buildconfig.yaml ccp-configs/pyspark/
+```
 
 **For Spark (Java) modules:**
-- Update `executableConfig.version` in the module YAML
-- If the code repo uses Maven, update `pom.xml` version accordingly (see `wf-java-stack` journal for multi-module version chain updates)
+
+```bash
+# 1. Update module YAML executableConfig.version
+NEWVER="<new-version>"
+rg --type yaml 'executableConfig:' ccp-configs/spark/ --files-with-matches | \
+  xargs -I {} yq eval ".executableConfig.version = \"${NEWVER}\"" -i {}
+
+# 2. For Maven pom.xml updates (if applicable):
+# Find all pom.xml files with the old version (see wf-java-stack journal for version chains)
+rg '<version>OLD_VERSION' --type xml ccp-configs/ --files-with-matches | \
+  xargs -I {} sd 'OLD_VERSION' 'NEW_VERSION' {}
+```
 
 **For SQL modules:**
 - No version bump needed — VTL files are deployed directly via `ccp link`

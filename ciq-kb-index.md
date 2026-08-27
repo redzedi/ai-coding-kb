@@ -13,7 +13,10 @@ Index of CommerceIQ ( CIQ ) products and domain information . CIQ is Saas compan
 
 | ciq-kb | File | Use when |
 |--------|------|----------|
-| workflows | ciq-kb/e2e-wf.md | wf cost optimization. ccp, azkaban, airflow, aws stepfunction ETL pipeline work |
+| etl ingestion parent | ciq-kb/etl-ingestion-overview.md | wf cost optimization. ccp, azkaban, airflow, aws stepfunction ETL pipeline work. Load this first |
+| avc UI report ingestion and etl | ciq-kb/azkaban-wf.md | cost optimization.  azkaban, ETL pipeline work. child of ciq-kb/etl-ingestion-overview.md  |
+| avc API report ingestion and etl | ciq-kb/airflow-wf.md | cost optimization.  airflow, aws stepfunction , lambda , sqs ,sns, ETL pipeline work. child of ciq-kb/etl-ingestion-overview.md   |
+| etl wf populating olap cubes | ciq-kb/ccp-etl-wf-esm-pra-omni.md | cost optimization.  ccp, brands , cubes. child of ciq-kb/etl-ingestion-overview.md   |
 | domain | ciq-kb/ciq-business-overview.md | end to end business context understanding |
 
 
